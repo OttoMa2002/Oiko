@@ -66,3 +66,74 @@ export const AGENT_SYSTEM_PROMPTS: Record<AgentStage, string> = {
   code: CODE_SYSTEM_PROMPT,
   review: REVIEW_SYSTEM_PROMPT,
 };
+
+export type AgentMeta = {
+  label: string;
+  tagline: string;
+  iconKey: "search" | "layout-grid" | "code-2" | "shield-check";
+  classes: {
+    chip: string;
+    chipBorder: string;
+    dot: string;
+    ring: string;
+    bar: string;
+    accentText: string;
+  };
+};
+
+export const AGENT_META: Record<AgentStage, AgentMeta> = {
+  research: {
+    label: "调研",
+    tagline: "理解需求，画出方向",
+    iconKey: "search",
+    classes: {
+      chip: "bg-cyan-50 text-cyan-700",
+      chipBorder: "border-cyan-200",
+      dot: "bg-cyan-500",
+      ring: "ring-cyan-200",
+      bar: "bg-cyan-500",
+      accentText: "text-cyan-700",
+    },
+  },
+  architecture: {
+    label: "架构",
+    tagline: "搭页面骨架与配色",
+    iconKey: "layout-grid",
+    classes: {
+      chip: "bg-blue-50 text-blue-700",
+      chipBorder: "border-blue-200",
+      dot: "bg-blue-500",
+      ring: "ring-blue-200",
+      bar: "bg-blue-500",
+      accentText: "text-blue-700",
+    },
+  },
+  code: {
+    label: "代码",
+    tagline: "生成可运行的 HTML",
+    iconKey: "code-2",
+    classes: {
+      chip: "bg-emerald-50 text-emerald-700",
+      chipBorder: "border-emerald-200",
+      dot: "bg-emerald-500",
+      ring: "ring-emerald-200",
+      bar: "bg-emerald-500",
+      accentText: "text-emerald-700",
+    },
+  },
+  review: {
+    label: "审核",
+    tagline: "审视并打分",
+    iconKey: "shield-check",
+    classes: {
+      chip: "bg-amber-50 text-amber-700",
+      chipBorder: "border-amber-200",
+      dot: "bg-amber-500",
+      ring: "ring-amber-200",
+      bar: "bg-amber-500",
+      accentText: "text-amber-700",
+    },
+  },
+};
+
+export const BUILD_STAGES: AgentStage[] = ["research", "architecture", "code"];

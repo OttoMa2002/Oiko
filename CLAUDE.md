@@ -228,3 +228,56 @@ ANTHROPIC_API_KEY=
 - Supabase RLS（Row Level Security）确保用户只能访问自己的数据
 - 所有 API route 需验证用户登录状态
 - 错误处理要完善：API 调用失败、网络超时、内容过大都要有友好提示
+
+---
+
+## 当前进度（最近更新 2026-05-17）
+
+### 已完成
+
+- **步骤 1（初始化）**：Next.js 14 + TS + Tailwind + ESLint，pnpm 安装；项目根目录小写 `oiko/`（npm 命名规则）。
+- **步骤 4 视觉部分（工作台 UI 骨架）**：顶部 Agent 进度条 + 左聊天 / 右 iframe 预览的响应式布局；stage 状态机用本地 React state + 写死的假回复驱动；点击"确认"会模拟 1.4 秒"思考"动画后切到下一阶段，进入代码阶段时 iframe 渲染内置的示例 HTML（`SAMPLE_HTML`）。**未接 Anthropic API**。
+- **Landing 页 hero 区**：渐变 Oiko 标志 + 主标语 + 两个 CTA + 四个 Agent 卡片。
+- **Dashboard / 登录 / 注册**：占位文字 + 返回主页链接，未接 Auth。
+- **共享组件**：`AgentBadge` `AgentProgressBar` `MessageBubble` `StageActions` `ChatPanel` `PreviewPane`。
+- **`lib/` 层**：`anthropic.ts` 服务端 client 懒加载封装；`agents.ts` 4 个 system prompt + token 预算 + 视觉 meta；`types.ts` 项目 / 审核 / 消息类型定义。
+- **API route 占位**：`/api/chat` `/api/scrape` `/api/review` 均返 501。
+
+### 未开始
+
+- 步骤 2：Supabase 注册 + Auth 流程（**用户账号尚未注册**，整体延后）。
+- 步骤 3：Dashboard 真实化（项目列表 + 新建入口）。
+- 步骤 5：接 Claude API，4 Agent 调用链。
+- 步骤 6：iframe 预览对接真实生成 HTML。
+- 步骤 7：项目保存 / 加载（依赖 Supabase）。
+- 步骤 8：网站审核功能（URL 抓取 + 审核 Agent）。
+- 步骤 9：UI 打磨、动画、响应式细化。
+- 步骤 10：Vercel 部署。
+
+## 实施中的设计调整（**覆盖前文**）
+
+以下决策在实施中由用户拍板。与本文档上方"UI/UX 设计原则"等冲突时**以本节为准**：
+
+- **浅色主题**：放弃"Atoms 深色主题 + 渐变点缀"，统一浅色（zinc-50 底 / zinc-900 文字）。
+- **品牌渐变 = 绿色系**：放弃靛紫紫红（用户评价"太 AI"），改为 `linear-gradient(135deg, #84cc16, #22c55e, #14b8a6)`（lime-500 → green-500 → teal-500）。挂在 `app/globals.css` 的 `.bg-gradient-brand` / `.text-gradient-brand`。
+- **架构 Agent 视觉色 = 蓝色（blue）**：原计划 violet，因"去紫"全局策略改为 blue。四个 Agent 最终色板：调研 cyan / 架构 blue / 代码 emerald / 审核 amber（chip = 50-系底 + 700-系字 + 200-系边，bar/dot = 500-系填充）。
+- **Tailwind `content` 必须包含 `./lib/**`**：因为 Agent 颜色类（`bg-cyan-500` 等）以字符串形式写在 `lib/agents.ts`，缺这条路径 JIT 不会生成对应 CSS，会出现"按钮透明、ring 配色错"的连锁视觉 bug。
+- **`修改` 按钮 = 聚焦输入框**：CLAUDE.md 原文里"修改"是"对当前阶段输出做局部 patch"的人机回路按钮，目前实现简化为点击后将光标 focus 到下方 textarea，等用户文字反馈触发 stage agent 重新生成。等接真 API 时再决定是否做"局部 patch"语义。
+
+## 已知问题 / 待修
+
+- **iframe 预览中点击锚点链接会"递归套娃"**
+  - 现象：`SAMPLE_HTML`（Lin 作品集 demo）里的 `<a href="#works">` 等导航锚点被点击时，整个 `/workspace/[id]` 父页面会被加载进 iframe 里，看上去像 Oiko 工作台无限递归。
+  - 原因：`<iframe srcdoc sandbox="allow-scripts">` 中 `about:srcdoc` 不支持锚点导航，浏览器回退到父 URL 触发加载。
+  - 修法预案二选一：(a) sandbox 去掉 `allow-top-navigation` 并把锚点 href 改 `javascript:void(0)`；(b) 注入 `<base target="_self">` + JS 拦截 `click` 默认。
+  - 优先级：低。接入真 Agent 生成 HTML 时一并处理（届时 SAMPLE_HTML 会被真实输出取代，但同样需要防御策略）。
+
+- **Auth 跳转链路尚未存在**
+  - Landing / Dashboard 上的"登录"按钮跳到 `/login`，但 login 页只是占位文字。dev server 偶发 chunk 加载错误通常是 `.next` 缓存未跟上文件结构变化；遇到时 Ctrl-C 重启 `pnpm dev` 即可。
+
+## 运行 / 开发提示
+
+- 包管理器：**pnpm**（lockfile 已提交）。
+- 启动开发：`pnpm dev`（默认 3000；被占用时自动跳 3001）。
+- 类型 + 路由检查：`pnpm build`（比 lint 单跑更彻底，会编译所有 route）。
+- 改 `tailwind.config.ts` 的 `content` 路径后偶尔需要重启 dev server，热重载不一定刷新 content map。

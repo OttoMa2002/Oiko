@@ -263,14 +263,13 @@ ANTHROPIC_API_KEY=
 - **架构 Agent 视觉色 = 蓝色（blue）**：原计划 violet，因"去紫"全局策略改为 blue。四个 Agent 最终色板：调研 cyan / 架构 blue / 代码 emerald / 审核 amber（chip = 50-系底 + 700-系字 + 200-系边，bar/dot = 500-系填充）。
 - **Tailwind `content` 必须包含 `./lib/**`**：因为 Agent 颜色类（`bg-cyan-500` 等）以字符串形式写在 `lib/agents.ts`，缺这条路径 JIT 不会生成对应 CSS，会出现"按钮透明、ring 配色错"的连锁视觉 bug。
 - **`修改` 按钮 = 聚焦输入框**：CLAUDE.md 原文里"修改"是"对当前阶段输出做局部 patch"的人机回路按钮，目前实现简化为点击后将光标 focus 到下方 textarea，等用户文字反馈触发 stage agent 重新生成。等接真 API 时再决定是否做"局部 patch"语义。
+- **每项目迭代上限 15 轮**：上文"成本与复杂度控制"写的是 10 轮，用户改为 **15** 轮。计数口径为"调用 `/api/chat` 成功的总次数"（初次研究 + 推进架构 + 推进代码 + 任何 stage 上的用户反馈迭代）。常量定义在 `lib/agents.ts` 的 `MAX_ITERATIONS_PER_PROJECT`。
+- **非流式 Agent 调用**：`/api/chat` 一次性返回完整内容，不做 SSE / streaming。代码 Agent 5–10 秒的等待用 ChatPanel 的"思考中"动画掩盖。等 demo 成熟再考虑流式。
 
 ## 已知问题 / 待修
 
-- **iframe 预览中点击锚点链接会"递归套娃"**
-  - 现象：`SAMPLE_HTML`（Lin 作品集 demo）里的 `<a href="#works">` 等导航锚点被点击时，整个 `/workspace/[id]` 父页面会被加载进 iframe 里，看上去像 Oiko 工作台无限递归。
-  - 原因：`<iframe srcdoc sandbox="allow-scripts">` 中 `about:srcdoc` 不支持锚点导航，浏览器回退到父 URL 触发加载。
-  - 修法预案二选一：(a) sandbox 去掉 `allow-top-navigation` 并把锚点 href 改 `javascript:void(0)`；(b) 注入 `<base target="_self">` + JS 拦截 `click` 默认。
-  - 优先级：低。接入真 Agent 生成 HTML 时一并处理（届时 SAMPLE_HTML 会被真实输出取代，但同样需要防御策略）。
+- ~~iframe 预览中点击锚点链接会"递归套娃"~~ **已修（注入防御脚本）**
+  - 修法：`lib/extractHtml.ts` 增加 `wrapForIframe()`，在 HTML 末尾 `</body>` 前注入一段轻量脚本，全局拦截 `<a>` 点击和 `<form>` 提交。`href="#xxx"` 走 smooth scroll，其他全部 `preventDefault()`。`PreviewPane` 在传 `srcDoc` 前先包一遍。
 
 - **Auth 跳转链路尚未存在**
   - Landing / Dashboard 上的"登录"按钮跳到 `/login`，但 login 页只是占位文字。dev server 偶发 chunk 加载错误通常是 `.next` 缓存未跟上文件结构变化；遇到时 Ctrl-C 重启 `pnpm dev` 即可。

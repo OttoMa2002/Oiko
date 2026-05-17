@@ -2,6 +2,7 @@
 
 import { MonitorPlay } from "lucide-react";
 import clsx from "clsx";
+import { wrapForIframe } from "@/lib/extractHtml";
 
 type Props = {
   html: string | null;
@@ -12,6 +13,8 @@ type Props = {
 const EMPTY_STATE_DOC = `<!DOCTYPE html><html><body style="margin:0;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa;color:#a1a1aa;font-size:14px;">等待代码 Agent 生成…</body></html>`;
 
 export function PreviewPane({ html, generating }: Props) {
+  const srcDoc = html ? wrapForIframe(html) : EMPTY_STATE_DOC;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-white">
@@ -29,7 +32,7 @@ export function PreviewPane({ html, generating }: Props) {
           <iframe
             title="Oiko preview"
             sandbox="allow-scripts"
-            srcDoc={html ?? EMPTY_STATE_DOC}
+            srcDoc={srcDoc}
             className="w-full h-full block"
           />
         </div>

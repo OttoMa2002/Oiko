@@ -137,3 +137,9 @@ export const AGENT_META: Record<AgentStage, AgentMeta> = {
 };
 
 export const BUILD_STAGES: AgentStage[] = ["research", "architecture", "code"];
+
+/**
+ * Max successful /api/chat calls per project session.
+ * Overrides CLAUDE.md's "10 轮" — user bumped to 15.
+ */
+export const MAX_ITERATIONS_PER_PROJECT = 15;

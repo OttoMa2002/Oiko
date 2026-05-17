@@ -21,6 +21,7 @@ type Props = {
   activeStage: AgentStage;
   inputDisabled: boolean;
   actionsDisabled: boolean;
+  showActions: boolean;
   done: boolean;
   onSend: (text: string) => void;
   onConfirm: () => void;
@@ -32,6 +33,7 @@ export function ChatPanel({
   activeStage,
   inputDisabled,
   actionsDisabled,
+  showActions,
   done,
   onSend,
   onConfirm,
@@ -77,18 +79,27 @@ export function ChatPanel({
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
       >
-        {messages.map((m) => (
-          <MessageBubble
-            key={m.id}
-            role={m.role}
-            stage={m.stage}
-            content={m.content}
-            thinking={m.thinking}
-          />
-        ))}
+        {messages.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-center text-sm text-zinc-400">
+            <div className="max-w-xs space-y-2">
+              <p className="font-medium text-zinc-600">还没开始 👋</p>
+              <p>在下方输入你想构建的网站描述，调研 Agent 会先帮你分析需求。</p>
+            </div>
+          </div>
+        ) : (
+          messages.map((m) => (
+            <MessageBubble
+              key={m.id}
+              role={m.role}
+              stage={m.stage}
+              content={m.content}
+              thinking={m.thinking}
+            />
+          ))
+        )}
       </div>
 
-      {!done && (
+      {!done && showActions && (
         <div className="px-4 py-2 border-t border-zinc-200">
           <StageActions
             stage={activeStage}

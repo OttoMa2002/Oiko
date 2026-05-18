@@ -1,17 +1,38 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertCircle, ArrowLeft, LogOut, Plus } from "lucide-react";
+import clsx from "clsx";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
 import { createProject } from "@/app/actions/projects";
 import { ProjectCard } from "@/components/ProjectCard";
+import { getUserCallCount } from "@/lib/usage";
+import {
+  MAX_API_CALLS_PER_USER,
+  MAX_PROJECTS_PER_USER,
+  PROJECT_CAP_ERROR,
+} from "@/lib/limits";
 import type { ProjectRow } from "@/lib/types";
 
 async function newProjectAction() {
   "use server";
-  const { id } = await createProject();
-  redirect(`/workspace/${id}`);
+  let newId: string | null = null;
+  try {
+    const result = await createProject();
+    newId = result.id;
+  } catch (e) {
+    if (e instanceof Error && e.message === PROJECT_CAP_ERROR) {
+      redirect("/dashboard?error=project-cap-reached");
+    }
+    throw e;
+  }
+  redirect(`/workspace/${newId}`);
 }
+
+const ERROR_MESSAGES: Record<string, string> = {
+  "project-not-found": "项目不存在或无访问权限。",
+  "project-cap-reached": `已达项目数上限（${MAX_PROJECTS_PER_USER} 个）。请先删除一些项目再创建。`,
+};
 
 export default async function DashboardPage({
   searchParams,
@@ -27,21 +48,33 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("id, name, initial_prompt, current_stage, done, updated_at")
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
+  const [{ data: projects }, callsUsed] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, name, initial_prompt, current_stage, done, updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false }),
+    getUserCallCount(user.id),
+  ]);
 
   const rows = (projects ?? []) as Pick<
     ProjectRow,
     "id" | "name" | "initial_prompt" | "current_stage" | "done" | "updated_at"
   >[];
 
-  const errorBanner =
-    searchParams.error === "project-not-found"
-      ? "项目不存在或无访问权限。"
-      : null;
+  const projectsCount = rows.length;
+  const callsRatio = callsUsed / MAX_API_CALLS_PER_USER;
+  const projectsRatio = projectsCount / MAX_PROJECTS_PER_USER;
+
+  function usageClass(ratio: number) {
+    if (ratio >= 1) return "text-red-600 font-medium";
+    if (ratio >= 0.8) return "text-amber-600 font-medium";
+    return "text-zinc-500";
+  }
+
+  const errorBanner = searchParams.error
+    ? ERROR_MESSAGES[searchParams.error] ?? null
+    : null;
 
   return (
     <main className="min-h-screen p-6 md:p-10 space-y-8">
@@ -54,7 +87,18 @@ export default async function DashboardPage({
           主页
         </Link>
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold">Dashboard</h1>
+            <p className="text-xs text-zinc-500">
+              <span className={clsx(usageClass(callsRatio))}>
+                已用 {callsUsed}/{MAX_API_CALLS_PER_USER} 调用
+              </span>
+              <span className="text-zinc-300 mx-2">·</span>
+              <span className={clsx(usageClass(projectsRatio))}>
+                {projectsCount}/{MAX_PROJECTS_PER_USER} 项目
+              </span>
+            </p>
+          </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-zinc-500">{user.email}</span>
             <form action={signOut}>

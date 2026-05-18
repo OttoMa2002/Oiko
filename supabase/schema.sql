@@ -64,3 +64,40 @@ create policy "users insert own reviews"
   on public.reviews for insert with check (auth.uid() = user_id);
 create policy "users delete own reviews"
   on public.reviews for delete using (auth.uid() = user_id);
+
+-- user_usage ----------------------------------------------------------------
+-- Account-level lifetime call counter. Read-only for the owning user;
+-- writes happen via the security-definer increment function below, which is
+-- exposed only to service_role (called from /api/chat after a successful
+-- Anthropic response).
+create table public.user_usage (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  total_calls integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_usage enable row level security;
+
+create policy "users see own usage"
+  on public.user_usage for select using (auth.uid() = user_id);
+
+create or replace function public.increment_user_calls(p_user_id uuid)
+returns integer
+language plpgsql
+security definer
+as $$
+declare
+  new_count integer;
+begin
+  insert into public.user_usage (user_id, total_calls)
+  values (p_user_id, 1)
+  on conflict (user_id)
+  do update set
+    total_calls = public.user_usage.total_calls + 1,
+    updated_at = now()
+  returning total_calls into new_count;
+  return new_count;
+end;
+$$;
+
+grant execute on function public.increment_user_calls(uuid) to service_role;

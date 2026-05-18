@@ -263,6 +263,10 @@ ANTHROPIC_API_KEY=
 - **Tailwind `content` 必须包含 `./lib/**`**：因为 Agent 颜色类（`bg-cyan-500` 等）以字符串形式写在 `lib/agents.ts`，缺这条路径 JIT 不会生成对应 CSS，会出现"按钮透明、ring 配色错"的连锁视觉 bug。
 - **`修改` 按钮 = 聚焦输入框**：CLAUDE.md 原文里"修改"是"对当前阶段输出做局部 patch"的人机回路按钮，目前实现简化为点击后将光标 focus 到下方 textarea，等用户文字反馈触发 stage agent 重新生成。等接真 API 时再决定是否做"局部 patch"语义。
 - **每项目迭代上限 15 轮**：上文"成本与复杂度控制"写的是 10 轮，用户改为 **15** 轮。计数口径为"调用 `/api/chat` 成功的总次数"（初次研究 + 推进架构 + 推进代码 + 任何 stage 上的用户反馈迭代）。常量定义在 `lib/agents.ts` 的 `MAX_ITERATIONS_PER_PROJECT`。
+- **账户级成本 / 项目数上限**：除了上面的"每项目 15 轮"，还有两层账户级保护，定义在 `lib/limits.ts`：
+  - `MAX_API_CALLS_PER_USER = 50`：每账户终身 `/api/chat` 成功调用上限 ≈ $1 Anthropic spend。计数存 `user_usage` 表，通过 `security definer` 函数 `increment_user_calls` 用 service_role 原子 +1，避免客户端绕过 / 并发 race。`/api/chat` 入口先 read 后 write。
+  - `MAX_PROJECTS_PER_USER = 5`：UX 防护，不是成本防护（用户删除可绕过）。`createProject` server action 在 insert 前 count 校验。
+  - Dashboard 顶部显示 "已用 X/50 调用 · X/5 项目"，比例 ≥80% 变 amber，达上限变 red。
 - **非流式 Agent 调用**：`/api/chat` 一次性返回完整内容，不做 SSE / streaming。代码 Agent 5–10 秒的等待用 ChatPanel 的"思考中"动画掩盖。等 demo 成熟再考虑流式。
 - **Auth 砍掉 Google OAuth，仅保留邮箱密码**：上文"用户系统"提到的 Google OAuth 在 demo 阶段移除。Google 接入需要 Google Cloud OAuth 凭证 + Supabase provider 配置，对挑战赛 demo ROI 低。`/login` `/signup` 页只保留邮箱 + 密码表单。后续若要加回，每页 5–10 分钟就能补上。
 

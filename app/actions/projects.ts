@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentStage } from "@/lib/agents";
+import { MAX_PROJECTS_PER_USER, PROJECT_CAP_ERROR } from "@/lib/limits";
 import type {
   ChatMessage,
   Outputs,
@@ -21,6 +22,16 @@ export async function createProject(): Promise<{ id: string }> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("未登录");
+
+  // Enforce account-level project cap before insert.
+  const { count } = await supabase
+    .from("projects")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if ((count ?? 0) >= MAX_PROJECTS_PER_USER) {
+    throw new Error(PROJECT_CAP_ERROR);
+  }
 
   const name = `Untitled · ${todayIso()}`;
   const { data, error } = await supabase
@@ -48,7 +59,6 @@ export async function getProject(id: string): Promise<ProjectRow | null> {
     .maybeSingle();
 
   if (error || !data) return null;
-  // RLS already enforces user_id match, but be defensive.
   if (data.user_id !== user.id) return null;
 
   return data as ProjectRow;
@@ -80,7 +90,6 @@ export async function updateProject(id: string, patch: ProjectPatch): Promise<vo
   if (patch.initialPrompt !== undefined) dbPatch.initial_prompt = patch.initialPrompt;
   if (patch.outputs !== undefined) dbPatch.outputs = patch.outputs;
   if (patch.agentHistory !== undefined) {
-    // Strip transient thinking entries before persisting.
     dbPatch.agent_history = patch.agentHistory.filter((m) => !m.thinking);
   }
   if (patch.generatedHtml !== undefined) dbPatch.generated_html = patch.generatedHtml;

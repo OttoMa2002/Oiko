@@ -7,7 +7,9 @@ import {
   type AgentStage,
 } from "@/lib/agents";
 import { CLAUDE_MODEL, getAnthropicClient } from "@/lib/anthropic";
+import { MAX_API_CALLS_PER_USER } from "@/lib/limits";
 import { createClient as createSupabaseServer } from "@/lib/supabase/server";
+import { getUserCallCount, incrementUserCalls } from "@/lib/usage";
 
 type Outputs = Partial<Record<AgentStage, string>>;
 
@@ -53,7 +55,6 @@ function buildMessages(
     return messages;
   }
 
-  // stage === "code"
   if (!outputs.architecture) {
     throw new Error("缺少架构阶段输出，无法进入代码阶段");
   }
@@ -79,13 +80,23 @@ function extractText(response: Anthropic.Messages.Message): string {
 }
 
 export async function POST(req: NextRequest) {
-  // Defense in depth: middleware protects /workspace UI, but also gate the API.
   const supabaseServer = createSupabaseServer();
   const {
     data: { user },
   } = await supabaseServer.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
+
+  // Cost guard: per-account lifetime call cap.
+  const used = await getUserCallCount(user.id);
+  if (used >= MAX_API_CALLS_PER_USER) {
+    return NextResponse.json(
+      {
+        error: `已达账户使用上限（${MAX_API_CALLS_PER_USER} 次调用）。当前已用 ${used} 次。`,
+      },
+      { status: 403 },
+    );
   }
 
   let body: RequestBody;
@@ -142,6 +153,13 @@ export async function POST(req: NextRequest) {
       system: AGENT_SYSTEM_PROMPTS[stage],
       messages,
     });
+
+    // Increment usage only on success. Failure to increment doesn't fail
+    // the response — undercount is preferable to losing the user's reply.
+    incrementUserCalls(user.id).catch((err) =>
+      console.error("Failed to increment user calls:", err),
+    );
+
     return NextResponse.json({ content: extractText(response) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "调用 Anthropic API 失败";

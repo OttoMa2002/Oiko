@@ -1,9 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronDown, Code2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, Code2 } from "lucide-react";
 import type { AgentStage } from "@/lib/agents";
 import { AGENT_META } from "@/lib/agents";
+import { extractHtml, looksLikeHtml } from "@/lib/extractHtml";
 import { AgentBadge } from "./AgentBadge";
 
 type Props = {
@@ -33,6 +34,46 @@ export function MessageBubble({ role, stage, content, thinking }: Props) {
   if (isLargeCode) {
     const lineCount = content.split("\n").length;
     const kb = (content.length / 1024).toFixed(1);
+    // Mirror the gating logic in workspace-client/callAgent: only treat the
+    // response as a valid preview update when it actually parses as HTML.
+    // Otherwise show a warning bubble so the user understands why the iframe
+    // didn't change — the previous behavior silently displayed "已生成 HTML"
+    // for partial / diff-style responses, which was misleading.
+    const isRealHtml = looksLikeHtml(extractHtml(content));
+
+    if (!isRealHtml) {
+      return (
+        <div className="flex flex-col items-start gap-1.5 w-full">
+          <AgentBadge stage={stage} size="sm" />
+          <details className="group max-w-[92%] w-full rounded-2xl rounded-tl-sm bg-amber-50 border border-amber-200 shadow-sm">
+            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-amber-100 rounded-2xl rounded-tl-sm group-open:rounded-b-none transition-colors">
+              <span className="flex items-center gap-2 text-amber-900 min-w-0">
+                <AlertTriangle
+                  size={14}
+                  strokeWidth={2.25}
+                  className="text-amber-600 shrink-0"
+                />
+                <span className="font-medium">本次未输出完整 HTML</span>
+                <span className="text-amber-700 truncate">· 预览未更新</span>
+              </span>
+              <ChevronDown
+                size={14}
+                strokeWidth={2.25}
+                className="text-amber-600 transition-transform duration-200 group-open:rotate-180 shrink-0"
+              />
+            </summary>
+            <div className="border-t border-amber-200 max-h-80 overflow-auto">
+              <pre className="text-xs font-mono whitespace-pre-wrap break-all text-amber-900 px-4 py-3 leading-relaxed">
+                {content}
+              </pre>
+            </div>
+          </details>
+          <p className="text-xs text-amber-700 pl-1">
+            💡 请再发一遍修改要求，要求代码 Agent 重出完整 HTML
+          </p>
+        </div>
+      );
+    }
 
     return (
       <div className="flex flex-col items-start gap-1.5 w-full">

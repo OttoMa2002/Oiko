@@ -11,6 +11,18 @@ import { StageActions } from "./StageActions";
 
 export type { ChatMessage };
 
+// Per-stage one-line hint shown beneath the agent label. Purpose: head off
+// the "I'm on code stage but my message is actually architecture-level"
+// trap — without this, users dump natural-language structural changes at
+// the code agent and get partial-HTML responses (see the amber warning
+// bubble in MessageBubble for the downstream consequence).
+const STAGE_HINTS: Record<AgentStage, string> = {
+  research: "这一步定义网站方向：目标用户、核心功能、整体风格",
+  architecture: "这一步规划页面骨架：sections、导航、配色方案",
+  code: "改内容 / 文本 / 细节留这里；改方向 / 结构 / 配色请点上方进度条切回上游 Agent",
+  review: "",
+};
+
 type Props = {
   messages: ChatMessage[];
   activeStage: AgentStage;
@@ -52,14 +64,21 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200">
-        <div className="flex items-center gap-2 text-sm">
-          <span className={clsx("h-2 w-2 rounded-full", meta.classes.dot)} />
-          <span className="font-medium text-zinc-900">{meta.label} Agent</span>
-          <span className="text-zinc-400">· {meta.tagline}</span>
+      <div className="px-4 py-3 border-b border-zinc-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <span className={clsx("h-2 w-2 rounded-full", meta.classes.dot)} />
+            <span className="font-medium text-zinc-900">{meta.label} Agent</span>
+            <span className="text-zinc-400">· {meta.tagline}</span>
+          </div>
+          {done && (
+            <span className="text-xs text-zinc-500">流程完成</span>
+          )}
         </div>
-        {done && (
-          <span className="text-xs text-zinc-500">流程完成</span>
+        {!done && STAGE_HINTS[activeStage] && (
+          <p className="mt-1.5 text-xs text-zinc-400 leading-relaxed">
+            {STAGE_HINTS[activeStage]}
+          </p>
         )}
       </div>
 

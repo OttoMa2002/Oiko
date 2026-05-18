@@ -236,6 +236,23 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
     callAgent(next, initialPrompt);
   }, [thinking, done, capped, initialPrompt, outputs, stage, completed, callAgent, persist]);
 
+  // Manual stage switching: lets the user click any already-reached stage chip
+  // on the progress bar and go back to talk to that stage's agent. Solves the
+  // "stuck on code stage but want to revise architecture" trap that produces
+  // partial-HTML outputs when natural-language project-level edits are sent
+  // to the code agent. Doesn't touch outputs / generatedHtml / messages —
+  // user can still see prior preview; if they re-confirm forward, downstream
+  // agents will re-run with the updated upstream context.
+  const handleStageClick = useCallback(
+    (targetStage: AgentStage) => {
+      if (thinking) return;
+      if (targetStage === stage) return;
+      setStage(targetStage);
+      persist({ currentStage: targetStage });
+    },
+    [thinking, stage, persist],
+  );
+
   const showActions = Boolean(outputs[stage]) && !thinking;
 
   return (
@@ -270,7 +287,12 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
             </span>
           </div>
         </div>
-        <AgentProgressBar currentStage={stage} completedStages={completed} done={done} />
+        <AgentProgressBar
+          currentStage={stage}
+          completedStages={completed}
+          done={done}
+          onStageClick={handleStageClick}
+        />
       </header>
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 min-h-0">

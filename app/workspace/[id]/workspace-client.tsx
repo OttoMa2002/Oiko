@@ -289,6 +289,7 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
         <section className="min-h-[60vh] md:min-h-0">
           <PreviewPane
             html={generatedHtml}
+            projectId={projectId}
             projectName={projectName}
             generating={thinking && stage === "code"}
           />

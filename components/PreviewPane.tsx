@@ -1,11 +1,13 @@
 "use client";
 
-import { Download, MonitorPlay } from "lucide-react";
+import { Check, Download, MonitorPlay, Share2 } from "lucide-react";
+import { useState } from "react";
 import clsx from "clsx";
 import { wrapForIframe } from "@/lib/extractHtml";
 
 type Props = {
   html: string | null;
+  projectId?: string;
   projectName?: string;
   /** When true, show a subtle pulse overlay to indicate the code agent is working. */
   generating?: boolean;
@@ -22,8 +24,27 @@ function sanitizeFilename(s: string): string {
   return cleaned || "oiko-site";
 }
 
-export function PreviewPane({ html, projectName, generating }: Props) {
+export function PreviewPane({ html, projectId, projectName, generating }: Props) {
   const srcDoc = html ? wrapForIframe(html) : EMPTY_STATE_DOC;
+  const [copied, setCopied] = useState(false);
+
+  function handleShare() {
+    if (!projectId) return;
+    const url = `${window.location.origin}/preview/${projectId}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setCopied(true);
+        // Revert label after a short beat — matches the inline-confirm pattern
+        // used by GitHub / Linear / Vercel copy-to-clipboard buttons.
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch(() => {
+        // Clipboard API can fail in non-secure contexts. Fallback: open the
+        // URL in a new tab so the user can grab it from the address bar.
+        window.open(url, "_blank", "noopener");
+      });
+  }
 
   function handleDownload() {
     if (!html) return;
@@ -46,6 +67,31 @@ export function PreviewPane({ html, projectName, generating }: Props) {
           <span className="font-medium">实时预览</span>
         </div>
         <div className="flex items-center gap-3">
+          {html && projectId && (
+            <button
+              type="button"
+              onClick={handleShare}
+              className={clsx(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                copied
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 hover:border-zinc-400",
+              )}
+              title="复制公开预览链接到剪贴板"
+            >
+              {copied ? (
+                <>
+                  <Check size={12} strokeWidth={2.5} />
+                  已复制
+                </>
+              ) : (
+                <>
+                  <Share2 size={12} strokeWidth={2.5} />
+                  分享
+                </>
+              )}
+            </button>
+          )}
           {html && (
             <button
               type="button"

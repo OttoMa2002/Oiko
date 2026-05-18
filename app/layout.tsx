@@ -15,8 +15,26 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Oiko — AI-Powered Web Builder",
-  description: "Describe your site in natural language. Watch multiple AI agents build it.",
+  metadataBase: new URL("https://oiko-murex.vercel.app"),
+  title: {
+    default: "Oiko — AI-Powered Web Builder",
+    template: "%s · Oiko",
+  },
+  description: "描述一个想法，看几个 AI Agent 帮你把它做成网站。多 Agent 协作 · 端到端建站。",
+  keywords: ["AI", "Web Builder", "Agent", "Anthropic", "Claude", "No-code", "建站", "AI 建站"],
+  openGraph: {
+    title: "Oiko — AI-Powered Web Builder",
+    description: "描述一个想法，看几个 AI Agent 帮你把它做成网站。",
+    url: "https://oiko-murex.vercel.app",
+    siteName: "Oiko",
+    type: "website",
+    locale: "zh_CN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Oiko — AI-Powered Web Builder",
+    description: "描述一个想法，看几个 AI Agent 帮你把它做成网站。",
+  },
 };
 
 export default function RootLayout({

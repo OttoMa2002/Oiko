@@ -27,9 +27,18 @@ function extractText(response: Anthropic.Messages.Message): string {
 
 function parseReviewJson(text: string): ReviewReport | null {
   let cleaned = text.trim();
-  // Strip ```json ... ``` fences if present.
+
   const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (fenceMatch) cleaned = fenceMatch[1].trim();
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  } else {
+    const first = cleaned.indexOf("{");
+    const last = cleaned.lastIndexOf("}");
+    if (first >= 0 && last > first) {
+      cleaned = cleaned.slice(first, last + 1);
+    }
+  }
+
   try {
     const parsed = JSON.parse(cleaned) as Partial<ReviewReport>;
     if (

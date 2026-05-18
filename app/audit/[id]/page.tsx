@@ -5,7 +5,6 @@ import {
   ExternalLink,
   Home,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
 import { getReview } from "@/app/actions/reviews";
@@ -125,10 +124,6 @@ export default async function AuditResultPage({
               {report.overall_score}
               <span className="text-2xl text-zinc-400 font-medium">/10</span>
             </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
-            <Sparkles size={12} />
-            审核 Agent · claude-sonnet-4-6
           </div>
         </section>
 

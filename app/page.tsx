@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, Code2, LayoutGrid, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, Code2, LayoutGrid, LogOut, Search, ShieldCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { signOut } from "@/app/actions/auth";
+import { startNewProjectAction } from "@/app/actions/projects";
 
 const AGENTS = [
   { icon: Search, label: "调研", desc: "理解需求", color: "text-cyan-600 bg-cyan-50 border-cyan-200" },
@@ -8,7 +11,12 @@ const AGENTS = [
   { icon: ShieldCheck, label: "审核", desc: "结构化反馈", color: "text-amber-600 bg-amber-50 border-amber-200" },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <main className="min-h-screen flex flex-col">
       <nav className="max-w-5xl w-full mx-auto px-6 py-5 flex items-center justify-between">
@@ -16,14 +24,38 @@ export default function LandingPage() {
           <span className="text-gradient-brand">Oiko</span>
         </span>
         <div className="flex items-center gap-5 text-sm text-zinc-500">
-          <Link href="/login" className="hover:text-zinc-900">登录</Link>
-          <Link
-            href="/signup"
-            className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-white text-sm font-medium bg-gradient-brand hover:opacity-90 transition-opacity"
-          >
-            开始构建
-            <ArrowRight size={14} />
-          </Link>
+          {user ? (
+            <>
+              <span className="text-zinc-500 hidden sm:inline">{user.email}</span>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-white text-sm font-medium bg-gradient-brand hover:opacity-90 transition-opacity"
+              >
+                进入 Dashboard
+                <ArrowRight size={14} />
+              </Link>
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-900"
+                >
+                  <LogOut size={12} />
+                  退出
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="hover:text-zinc-900">登录</Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-white text-sm font-medium bg-gradient-brand hover:opacity-90 transition-opacity"
+              >
+                开始构建
+                <ArrowRight size={14} />
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -46,19 +78,41 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Link
-            href="/workspace/demo"
-            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-white text-sm font-medium bg-gradient-brand hover:opacity-90 transition-opacity"
-          >
-            体验工作台 demo
-            <ArrowRight size={14} />
-          </Link>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
-          >
-            进入 Dashboard
-          </Link>
+          {user ? (
+            <>
+              <form action={startNewProjectAction}>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-white text-sm font-medium bg-gradient-brand hover:opacity-90 transition-opacity"
+                >
+                  新建项目
+                  <ArrowRight size={14} />
+                </button>
+              </form>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
+              >
+                进入 Dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-white text-sm font-medium bg-gradient-brand hover:opacity-90 transition-opacity"
+              >
+                免费注册体验
+                <ArrowRight size={14} />
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
+              >
+                登录
+              </Link>
+            </>
+          )}
         </div>
 
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -78,10 +132,6 @@ export default function LandingPage() {
             );
           })}
         </div>
-
-        <p className="mt-12 text-xs text-zinc-400">
-          当前为脚手架版本：Auth、持久化、Agent 运行时尚未接入，工作台演示使用本地假数据。
-        </p>
       </section>
     </main>
   );

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { AgentStage } from "@/lib/agents";
 import { MAX_PROJECTS_PER_USER, PROJECT_CAP_ERROR } from "@/lib/limits";
@@ -42,6 +43,25 @@ export async function createProject(): Promise<{ id: string }> {
 
   if (error) throw new Error(error.message);
   return { id: data.id };
+}
+
+/**
+ * Form-action helper: create a new project then redirect into its workspace.
+ * On project-cap hit, redirects back to dashboard with an error banner.
+ * Used by both the dashboard "新建项目" button and the landing page demo CTA.
+ */
+export async function startNewProjectAction(): Promise<never> {
+  let newId: string;
+  try {
+    const result = await createProject();
+    newId = result.id;
+  } catch (e) {
+    if (e instanceof Error && e.message === PROJECT_CAP_ERROR) {
+      redirect("/dashboard?error=project-cap-reached");
+    }
+    throw e;
+  }
+  redirect(`/workspace/${newId}`);
 }
 
 /** Read a single project; returns null if not found or not owned. */

@@ -11,31 +11,15 @@ import {
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
-import { createProject } from "@/app/actions/projects";
+import { startNewProjectAction } from "@/app/actions/projects";
 import { ProjectCard } from "@/components/ProjectCard";
 import { getUserUsage } from "@/lib/usage";
 import {
   MAX_API_CALLS_PER_USER,
   MAX_PROJECTS_PER_USER,
   MAX_REVIEWS_PER_USER,
-  PROJECT_CAP_ERROR,
 } from "@/lib/limits";
 import type { ProjectRow, ReviewReport } from "@/lib/types";
-
-async function newProjectAction() {
-  "use server";
-  let newId: string | null = null;
-  try {
-    const result = await createProject();
-    newId = result.id;
-  } catch (e) {
-    if (e instanceof Error && e.message === PROJECT_CAP_ERROR) {
-      redirect("/dashboard?error=project-cap-reached");
-    }
-    throw e;
-  }
-  redirect(`/workspace/${newId}`);
-}
 
 const ERROR_MESSAGES: Record<string, string> = {
   "project-not-found": "项目不存在或无访问权限。",
@@ -167,7 +151,7 @@ export default async function DashboardPage({
       <section className="max-w-5xl mx-auto w-full space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase opacity-50 tracking-wide">Projects</h2>
-          <form action={newProjectAction}>
+          <form action={startNewProjectAction}>
             <button
               type="submit"
               className="inline-flex items-center gap-1 rounded-full bg-gradient-brand px-3.5 py-1.5 text-sm text-white font-medium hover:opacity-90 transition-opacity"
@@ -180,7 +164,7 @@ export default async function DashboardPage({
         {projectRows.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
             <p className="text-sm text-zinc-500">还没有项目。</p>
-            <form action={newProjectAction} className="mt-4 inline-block">
+            <form action={startNewProjectAction} className="mt-4 inline-block">
               <button
                 type="submit"
                 className="inline-flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm text-white font-medium hover:opacity-90 transition-opacity"

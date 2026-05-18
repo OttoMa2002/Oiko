@@ -194,6 +194,7 @@ Oiko 的代码 Agent 设计是**故意约束**的，单次输出上限 4096 toke
 其他工程性限制：
 
 - iframe 首次预览渲染慢 1-3 秒（Tailwind CDN 拉取 + JIT 编译，固有特性）
+- **代码 Agent 单次输出约 200 行高密度 / 600 行普通密度 HTML**（`max_tokens=8192`）。复杂多 section 项目（详细简历、多区块官网）超出后迭代会触发输出截断，UI 会显示 amber 警告并建议切回架构 Agent 简化结构。治本方案是 diff-style editing（v0 / bolt.new 的做法），属于产品级演进、超出 demo 范围
 - `/api/scrape` 只抓单页内容，不爬子链接、不执行 JS（SPA 会抓到空壳）
 - 慢网络 / 跨境 VPN 下代码 Agent 偶发 `Failed to fetch`（响应耗时 15–30s，客户端 TCP 可能中途断）
 - Vercel Hobby 函数超时上限 60s（已在三个 API route 上显式声明 `maxDuration`）

@@ -1,11 +1,20 @@
 /**
- * Heuristic: does this string look like a real HTML document?
+ * Heuristic: does this string look like a real, *complete* HTML document?
  * Used by the workspace to decide whether a code-Agent response should
  * replace the live preview or just sit in chat as conversational text.
+ *
+ * Both ends must look right: opens with <!doctype html> or <html ...>, AND
+ * closes with </html>. The closing check is what catches max_tokens truncation
+ * — a response that starts as a valid document but cut off mid-write (no
+ * </html>) should NOT replace the preview, otherwise we'd swap the user's
+ * working HTML for a broken half-render.
  */
 export function looksLikeHtml(s: string): boolean {
   const t = s.trim().toLowerCase();
-  return t.startsWith("<!doctype html") || /^<html[\s>]/.test(t);
+  const startsOk =
+    t.startsWith("<!doctype html") || /^<html[\s>]/.test(t);
+  const endsOk = t.endsWith("</html>");
+  return startsOk && endsOk;
 }
 
 /**

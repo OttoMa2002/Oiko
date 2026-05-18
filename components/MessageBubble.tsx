@@ -42,6 +42,26 @@ export function MessageBubble({ role, stage, content, thinking }: Props) {
     const isRealHtml = looksLikeHtml(extractHtml(content));
 
     if (!isRealHtml) {
+      // Distinguish "Claude refused to emit full HTML" from "Claude tried but
+      // hit max_tokens mid-write" — the user-facing fix is completely
+      // different. Truncated: simplify the project, can't just retry.
+      // Partial / chatty: the user just needs to resend the request.
+      const lowered = content.trim().toLowerCase();
+      const startsLikeDoc =
+        lowered.startsWith("<!doctype") || /^<html[\s>]/.test(lowered);
+      const endsLikeDoc = lowered.endsWith("</html>");
+      const isLikelyTruncated = startsLikeDoc && !endsLikeDoc;
+
+      const title = isLikelyTruncated
+        ? "本次输出在结尾处被截断"
+        : "本次未输出完整 HTML";
+      const subtitle = isLikelyTruncated
+        ? `· 已写 ${kb} KB · 预览保留上一版`
+        : "· 预览未更新";
+      const hint = isLikelyTruncated
+        ? "💡 项目可能接近模型单次输出上限。建议点上方进度条切回架构 Agent 简化结构（去掉非必要 sections），或在 Dashboard 新建一个更轻量的版本继续迭代。"
+        : "💡 请再发一遍修改要求，要求代码 Agent 重出完整 HTML";
+
       return (
         <div className="flex flex-col items-start gap-1.5 w-full">
           <AgentBadge stage={stage} size="sm" />
@@ -53,8 +73,8 @@ export function MessageBubble({ role, stage, content, thinking }: Props) {
                   strokeWidth={2.25}
                   className="text-amber-600 shrink-0"
                 />
-                <span className="font-medium">本次未输出完整 HTML</span>
-                <span className="text-amber-700 truncate">· 预览未更新</span>
+                <span className="font-medium">{title}</span>
+                <span className="text-amber-700 truncate">{subtitle}</span>
               </span>
               <ChevronDown
                 size={14}
@@ -68,8 +88,8 @@ export function MessageBubble({ role, stage, content, thinking }: Props) {
               </pre>
             </div>
           </details>
-          <p className="text-xs text-amber-700 pl-1">
-            💡 请再发一遍修改要求，要求代码 Agent 重出完整 HTML
+          <p className="text-xs text-amber-700 pl-1 leading-relaxed max-w-[92%]">
+            {hint}
           </p>
         </div>
       );

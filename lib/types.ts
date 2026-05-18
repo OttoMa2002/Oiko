@@ -2,11 +2,19 @@ import type { AgentStage } from "./agents";
 
 export type ProjectStatus = "draft" | "completed";
 
+export type Outputs = Partial<Record<AgentStage, string>>;
+
+/**
+ * Chat message used both for live UI and as the serialized shape inside
+ * the `agent_history` jsonb column. `thinking` is transient and never
+ * persisted (we strip thinking-true entries before saving).
+ */
 export type ChatMessage = {
+  id: string;
   role: "user" | "assistant";
   stage: AgentStage;
   content: string;
-  created_at: string;
+  thinking?: boolean;
 };
 
 export type ArchitectureSpec = {
@@ -21,13 +29,19 @@ export type ArchitectureSpec = {
   style: string;
 };
 
-export type Project = {
+/** Mirror of the public.projects row in Supabase. */
+export type ProjectRow = {
   id: string;
   user_id: string;
   name: string;
-  description: string | null;
-  generated_html: string | null;
+  initial_prompt: string | null;
+  outputs: Outputs;
   agent_history: ChatMessage[];
+  generated_html: string | null;
+  current_stage: AgentStage;
+  completed_stages: AgentStage[];
+  done: boolean;
+  iterations: number;
   status: ProjectStatus;
   created_at: string;
   updated_at: string;

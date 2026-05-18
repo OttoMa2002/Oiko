@@ -236,21 +236,20 @@ ANTHROPIC_API_KEY=
 ### 已完成
 
 - **步骤 1（初始化）**：Next.js 14 + TS + Tailwind + ESLint，pnpm 安装；项目根目录小写 `oiko/`（npm 命名规则）。
-- **步骤 4 视觉部分（工作台 UI 骨架）**：顶部 Agent 进度条 + 左聊天 / 右 iframe 预览的响应式布局；stage 状态机用本地 React state + 写死的假回复驱动；点击"确认"会模拟 1.4 秒"思考"动画后切到下一阶段，进入代码阶段时 iframe 渲染内置的示例 HTML（`SAMPLE_HTML`）。**未接 Anthropic API**。
+- **步骤 2（Auth）**：Supabase 项目已创建；`@supabase/supabase-js` + `@supabase/ssr` 接入；邮箱密码注册 / 登录 / 登出真实可用；根目录 `middleware.ts` 做 session 自动刷新 + 路由守卫（`/dashboard` `/workspace/*` 未登录跳 `/login`，已登录访问 `/login` `/signup` 跳 `/dashboard`）；`/api/chat` 也做了服务端 user 校验（401 兜底）。`lib/supabase/{client,server,admin,middleware}.ts` 四件套 + `app/actions/auth.ts` server action 登出。**持久化（projects/reviews 表）尚未做**。
+- **步骤 4（工作台 UI + 真 Agent）**：顶部 Agent 进度条 + 左聊天 / 右 iframe 预览的响应式布局；stage 状态机 + 错误展示 + 15 轮迭代上限；接 `/api/chat` 真调 `claude-sonnet-4-6`，代码 Agent 输出经 `extractHtml` 清洗 + `wrapForIframe` 注入防递归脚本后送 iframe；代码消息在 chat 里默认折叠（>500 字符触发）。
 - **Landing 页 hero 区**：渐变 Oiko 标志 + 主标语 + 两个 CTA + 四个 Agent 卡片。
-- **Dashboard / 登录 / 注册**：占位文字 + 返回主页链接，未接 Auth。
+- **登录 / 注册**：左右分栏布局（左品牌渐变 + slogan，右表单），邮箱密码表单 + 验证 + loading + 错误展示；登录支持 `?redirectTo=` 参数。
 - **共享组件**：`AgentBadge` `AgentProgressBar` `MessageBubble` `StageActions` `ChatPanel` `PreviewPane`。
-- **`lib/` 层**：`anthropic.ts` 服务端 client 懒加载封装；`agents.ts` 4 个 system prompt + token 预算 + 视觉 meta；`types.ts` 项目 / 审核 / 消息类型定义。
-- **API route 占位**：`/api/chat` `/api/scrape` `/api/review` 均返 501。
+- **`lib/` 层**：`anthropic.ts` 服务端 client 懒加载；`agents.ts` 4 个 system prompt + token 预算 + 视觉 meta + `MAX_ITERATIONS_PER_PROJECT`；`extractHtml.ts` + `wrapForIframe`；`supabase/` 四件套；`types.ts` 项目 / 审核 / 消息类型定义。
+
+### 已完成（续）
+
+- **步骤 3 + 步骤 7（Dashboard 真实化 + 持久化）**：`supabase/schema.sql` 建 `projects` + `reviews` 两张表 + RLS（用户只读写自己 row）+ `updated_at` 触发器。`app/actions/projects.ts` 提供 `createProject` / `getProject` / `updateProject` / `deleteProject` 四个 server action。Dashboard 是 server component，从 DB 读 projects 列表渲染 `ProjectCard`，"新建项目"按钮触发 server action 插入 + 跳转到新 workspace。Workspace 拆成 server `page.tsx`（fetch 项目 + 不存在/无权限重定向到 `/dashboard?error=project-not-found`）+ client `workspace-client.tsx`（接 initialState、每次 callAgent / 确认成功后 fire-and-forget 调 `updateProject` 持久化）。`agent_history` 持久化前过滤掉 `thinking: true` 的 transient 消息。
 
 ### 未开始
 
-- 步骤 2：Supabase 注册 + Auth 流程（**用户账号尚未注册**，整体延后）。
-- 步骤 3：Dashboard 真实化（项目列表 + 新建入口）。
-- 步骤 5：接 Claude API，4 Agent 调用链。
-- 步骤 6：iframe 预览对接真实生成 HTML。
-- 步骤 7：项目保存 / 加载（依赖 Supabase）。
-- 步骤 8：网站审核功能（URL 抓取 + 审核 Agent）。
+- 步骤 8：网站审核功能（`/api/scrape` + `/api/review` + 前端 URL 输入 / 报告页）。`reviews` 表 schema 已建好待用。
 - 步骤 9：UI 打磨、动画、响应式细化。
 - 步骤 10：Vercel 部署。
 
@@ -265,6 +264,7 @@ ANTHROPIC_API_KEY=
 - **`修改` 按钮 = 聚焦输入框**：CLAUDE.md 原文里"修改"是"对当前阶段输出做局部 patch"的人机回路按钮，目前实现简化为点击后将光标 focus 到下方 textarea，等用户文字反馈触发 stage agent 重新生成。等接真 API 时再决定是否做"局部 patch"语义。
 - **每项目迭代上限 15 轮**：上文"成本与复杂度控制"写的是 10 轮，用户改为 **15** 轮。计数口径为"调用 `/api/chat` 成功的总次数"（初次研究 + 推进架构 + 推进代码 + 任何 stage 上的用户反馈迭代）。常量定义在 `lib/agents.ts` 的 `MAX_ITERATIONS_PER_PROJECT`。
 - **非流式 Agent 调用**：`/api/chat` 一次性返回完整内容，不做 SSE / streaming。代码 Agent 5–10 秒的等待用 ChatPanel 的"思考中"动画掩盖。等 demo 成熟再考虑流式。
+- **Auth 砍掉 Google OAuth，仅保留邮箱密码**：上文"用户系统"提到的 Google OAuth 在 demo 阶段移除。Google 接入需要 Google Cloud OAuth 凭证 + Supabase provider 配置，对挑战赛 demo ROI 低。`/login` `/signup` 页只保留邮箱 + 密码表单。后续若要加回，每页 5–10 分钟就能补上。
 
 ## 已知问题 / 待修
 

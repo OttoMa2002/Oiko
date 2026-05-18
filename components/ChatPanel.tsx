@@ -5,16 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { AgentStage } from "@/lib/agents";
 import { AGENT_META } from "@/lib/agents";
+import type { ChatMessage } from "@/lib/types";
 import { MessageBubble } from "./MessageBubble";
 import { StageActions } from "./StageActions";
 
-export type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  stage: AgentStage;
-  content: string;
-  thinking?: boolean;
-};
+export type { ChatMessage };
 
 type Props = {
   messages: ChatMessage[];

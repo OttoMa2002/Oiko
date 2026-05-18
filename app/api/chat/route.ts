@@ -7,6 +7,7 @@ import {
   type AgentStage,
 } from "@/lib/agents";
 import { CLAUDE_MODEL, getAnthropicClient } from "@/lib/anthropic";
+import { createClient as createSupabaseServer } from "@/lib/supabase/server";
 
 type Outputs = Partial<Record<AgentStage, string>>;
 
@@ -78,6 +79,15 @@ function extractText(response: Anthropic.Messages.Message): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Defense in depth: middleware protects /workspace UI, but also gate the API.
+  const supabaseServer = createSupabaseServer();
+  const {
+    data: { user },
+  } = await supabaseServer.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
+
   let body: RequestBody;
   try {
     body = (await req.json()) as RequestBody;

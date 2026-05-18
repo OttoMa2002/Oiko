@@ -1,4 +1,14 @@
 /**
+ * Heuristic: does this string look like a real HTML document?
+ * Used by the workspace to decide whether a code-Agent response should
+ * replace the live preview or just sit in chat as conversational text.
+ */
+export function looksLikeHtml(s: string): boolean {
+  const t = s.trim().toLowerCase();
+  return t.startsWith("<!doctype html") || /^<html[\s>]/.test(t);
+}
+
+/**
  * Pull a usable HTML string out of the code Agent's raw response.
  * The agent's system prompt asks for raw HTML only, but models occasionally
  * wrap output in ```html ... ``` fences or include a short preface — strip

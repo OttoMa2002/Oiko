@@ -9,10 +9,13 @@ import { createClient } from "@/lib/supabase/client";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function SignupPage() {
+type Props = {
+  redirectTo?: string;
+};
+
+export function LoginForm({ redirectTo }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -20,7 +23,6 @@ export default function SignupPage() {
   function validate(): string | null {
     if (!EMAIL_RE.test(email.trim())) return "请输入有效的邮箱地址";
     if (password.length < 6) return "密码至少 6 位";
-    if (password !== confirm) return "两次输入的密码不一致";
     return null;
   }
 
@@ -34,7 +36,7 @@ export default function SignupPage() {
     }
     setLoading(true);
     const supabase = createClient();
-    const { data, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -43,22 +45,15 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
-    if (!data.session) {
-      setError(
-        "注册成功，但需要邮箱验证后才能登录。请到 Supabase Dashboard → Authentication → Providers → Email 关闭 'Confirm email' 后重试。",
-      );
-      setLoading(false);
-      return;
-    }
-    router.replace("/dashboard");
+    router.replace(redirectTo || "/dashboard");
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
       <header className="space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">创建账号</h1>
-        <p className="text-sm text-zinc-500">注册 Oiko 开始用 AI 构建你的网站</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">欢迎回来</h1>
+        <p className="text-sm text-zinc-500">登录你的 Oiko 账号继续构建</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -86,33 +81,27 @@ export default function SignupPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="text-xs font-medium text-zinc-700">
-            密码
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-xs font-medium text-zinc-700">
+              密码
+            </label>
+            <button
+              type="button"
+              className="text-xs text-zinc-400 hover:text-zinc-600 cursor-not-allowed"
+              disabled
+              title="待实现"
+            >
+              忘记密码？
+            </button>
+          </div>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
-            autoComplete="new-password"
+            autoComplete="current-password"
             placeholder="至少 6 位"
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 disabled:opacity-60"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="confirm" className="text-xs font-medium text-zinc-700">
-            确认密码
-          </label>
-          <input
-            id="confirm"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            disabled={loading}
-            autoComplete="new-password"
-            placeholder="再输入一次"
             className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 disabled:opacity-60"
           />
         </div>
@@ -128,11 +117,11 @@ export default function SignupPage() {
           {loading ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              注册中…
+              登录中…
             </>
           ) : (
             <>
-              创建账号
+              登录
               <ArrowRight size={14} />
             </>
           )}
@@ -140,12 +129,12 @@ export default function SignupPage() {
       </form>
 
       <p className="text-center text-sm text-zinc-500">
-        已经有账号？{" "}
+        还没有账号？{" "}
         <Link
-          href="/login"
+          href="/signup"
           className="font-medium text-zinc-900 hover:underline"
         >
-          立即登录
+          立即注册
         </Link>
       </p>
     </div>

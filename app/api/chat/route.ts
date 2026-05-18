@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Anthropic from "@anthropic-ai/sdk";
+
+// Claude code-stage responses (max_tokens=4096) can take 15–30s. Vercel's
+// default function timeout would cut the connection mid-stream and the
+// browser sees "Failed to fetch". 60s is the Hobby-plan ceiling.
+export const maxDuration = 60;
 import {
   AGENT_MAX_TOKENS,
   AGENT_SYSTEM_PROMPTS,

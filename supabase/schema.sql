@@ -73,6 +73,7 @@ create policy "users delete own reviews"
 create table public.user_usage (
   user_id uuid primary key references auth.users(id) on delete cascade,
   total_calls integer not null default 0,
+  total_reviews integer not null default 0,
   updated_at timestamptz not null default now()
 );
 
@@ -101,3 +102,24 @@ end;
 $$;
 
 grant execute on function public.increment_user_calls(uuid) to service_role;
+
+create or replace function public.increment_user_reviews(p_user_id uuid)
+returns integer
+language plpgsql
+security definer
+as $$
+declare
+  new_count integer;
+begin
+  insert into public.user_usage (user_id, total_reviews)
+  values (p_user_id, 1)
+  on conflict (user_id)
+  do update set
+    total_reviews = public.user_usage.total_reviews + 1,
+    updated_at = now()
+  returning total_reviews into new_count;
+  return new_count;
+end;
+$$;
+
+grant execute on function public.increment_user_reviews(uuid) to service_role;

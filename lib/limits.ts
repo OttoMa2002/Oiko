@@ -6,6 +6,9 @@
 /** Max lifetime successful /api/chat calls per account (≈ $1 of Anthropic spend). */
 export const MAX_API_CALLS_PER_USER = 50;
 
+/** Max lifetime successful /api/review calls per account (separate budget pool). */
+export const MAX_REVIEWS_PER_USER = 20;
+
 /** Max active projects per account (UX guard, not cost guard). */
 export const MAX_PROJECTS_PER_USER = 5;
 

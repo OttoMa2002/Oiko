@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Home, Sparkles } from "lucide-react";
 import type { AgentStage } from "@/lib/agents";
@@ -20,6 +20,12 @@ function nextStage(stage: AgentStage): AgentStage | null {
   const idx = BUILD_STAGES.indexOf(stage);
   if (idx === -1 || idx === BUILD_STAGES.length - 1) return null;
   return BUILD_STAGES[idx + 1];
+}
+
+/** Matches the auto-generated default name from `createProject` so we only
+ *  overwrite when the user hasn't customized the title. */
+function isUntitledDefault(name: string): boolean {
+  return /^Untitled · \d{4}-\d{2}-\d{2}$/.test(name);
 }
 
 export type WorkspaceInitialState = {
@@ -47,6 +53,17 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
   const [initialPrompt, setInitialPrompt] = useState<string | null>(initialState.initialPrompt);
   const [outputs, setOutputs] = useState<Outputs>(initialState.outputs);
   const [messages, setMessages] = useState<ChatMessage[]>(initialState.agentHistory);
+  const [projectName, setProjectName] = useState(initialState.projectName);
+
+  // Mirror `messages` so async callbacks (callAgent fetch handlers) can read
+  // the latest list without re-binding to a stale closure. Every setMessages
+  // call below also updates this ref synchronously — never read `messages`
+  // directly inside callAgent / handleSend, always `messagesRef.current`.
+  const messagesRef = useRef<ChatMessage[]>(initialState.agentHistory);
+  const setMessagesSync = useCallback((next: ChatMessage[]) => {
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
 
   const capped = iterations >= MAX_ITERATIONS_PER_PROJECT;
 
@@ -70,7 +87,9 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
         content: "",
         thinking: true,
       };
-      setMessages((m) => [...m, thinkingMsg]);
+      const baseMsgs = messagesRef.current;
+      const withThinking = [...baseMsgs, thinkingMsg];
+      setMessagesSync(withThinking);
 
       try {
         const res = await fetch("/api/chat", {
@@ -87,18 +106,18 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
 
         if (!res.ok) {
           const errMsg = (data && data.error) || `请求失败 (${res.status})`;
-          const errored = messages.concat(thinkingMsg).map((msg) =>
+          const errored = withThinking.map((msg) =>
             msg.id === thinkingId
               ? { ...msg, content: `⚠️ ${errMsg}`, thinking: false }
               : msg,
           );
-          setMessages(errored);
+          setMessagesSync(errored);
           persist({ agentHistory: errored });
           return;
         }
 
         const content = String(data.content ?? "");
-        const newMsgs = messages.concat(thinkingMsg).map((msg) =>
+        const newMsgs = withThinking.map((msg) =>
           msg.id === thinkingId ? { ...msg, content, thinking: false } : msg,
         );
 
@@ -119,7 +138,7 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
         }
         const newIterations = iterations + 1;
 
-        setMessages(newMsgs);
+        setMessagesSync(newMsgs);
         setOutputs(newOutputs);
         setIterations(newIterations);
         if (newHtml !== generatedHtml) setGeneratedHtml(newHtml);
@@ -130,42 +149,73 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
           iterations: newIterations,
           generatedHtml: newHtml,
         });
+
+        // Fire-and-forget: after the research agent's first successful
+        // response, ask Claude for a concise project title. Only overwrite
+        // when the name is still the auto-generated "Untitled · YYYY-MM-DD"
+        // default — never clobber a name the user may have personalized.
+        if (forStage === "research" && isUntitledDefault(projectName)) {
+          fetch("/api/title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt }),
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data && typeof data.title === "string" && data.title) {
+                setProjectName(data.title);
+                persist({ name: data.title });
+              }
+            })
+            .catch(() => {});
+        }
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : "网络错误";
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === thinkingId
-              ? { ...msg, content: `⚠️ ${errMsg}`, thinking: false }
-              : msg,
-          ),
+        const errored = messagesRef.current.map((msg) =>
+          msg.id === thinkingId
+            ? { ...msg, content: `⚠️ ${errMsg}`, thinking: false }
+            : msg,
         );
+        setMessagesSync(errored);
       } finally {
         setThinking(false);
       }
     },
-    [outputs, messages, iterations, generatedHtml, persist],
+    [outputs, iterations, generatedHtml, persist, setMessagesSync, projectName],
   );
 
   const handleSend = useCallback(
     (text: string) => {
       if (thinking || capped) return;
 
+      const userMsg: ChatMessage = { id: makeId(), role: "user", stage, content: text };
+      const newMsgs = [...messagesRef.current, userMsg];
+      setMessagesSync(newMsgs);
+
       if (!initialPrompt) {
-        const userMsg: ChatMessage = { id: makeId(), role: "user", stage, content: text };
-        const newMsgs = [...messages, userMsg];
         setInitialPrompt(text);
-        setMessages(newMsgs);
         persist({ initialPrompt: text, agentHistory: newMsgs });
         callAgent(stage, text);
         return;
       }
 
-      const userMsg: ChatMessage = { id: makeId(), role: "user", stage, content: text };
-      setMessages((m) => [...m, userMsg]);
       callAgent(stage, initialPrompt, text);
     },
-    [thinking, capped, initialPrompt, stage, messages, callAgent, persist],
+    [thinking, capped, initialPrompt, stage, callAgent, persist, setMessagesSync],
   );
+
+  // Auto-kick: if landing-page example pre-filled initialPrompt at create time
+  // (so it's already in initialState) and no agent has run yet, simulate the
+  // user submitting that prompt as the first message and trigger the research
+  // agent. Guarded by ref so React Strict Mode double-effect can't double-fire.
+  const autoKickedRef = useRef(false);
+  useEffect(() => {
+    if (autoKickedRef.current) return;
+    if (initialState.initialPrompt && initialState.agentHistory.length === 0) {
+      autoKickedRef.current = true;
+      handleSend(initialState.initialPrompt);
+    }
+  }, [initialState.initialPrompt, initialState.agentHistory.length, handleSend]);
 
   const handleConfirm = useCallback(() => {
     if (thinking || done || capped) return;
@@ -185,10 +235,6 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
     persist({ completedStages: newCompleted, currentStage: next });
     callAgent(next, initialPrompt);
   }, [thinking, done, capped, initialPrompt, outputs, stage, completed, callAgent, persist]);
-
-  const handleModify = useCallback(() => {
-    // ChatPanel focuses its textarea internally.
-  }, []);
 
   const showActions = Boolean(outputs[stage]) && !thinking;
 
@@ -216,7 +262,7 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
           <div className="flex items-center gap-2 text-xs text-zinc-400">
             <Sparkles size={12} />
             <span className="text-zinc-700 font-medium truncate max-w-[280px]">
-              {initialState.projectName}
+              {projectName}
             </span>
             <span className="text-zinc-300">·</span>
             <span className={capped ? "text-amber-600 font-medium" : ""}>
@@ -238,11 +284,14 @@ export function WorkspaceClient({ initialState }: { initialState: WorkspaceIniti
             done={done}
             onSend={handleSend}
             onConfirm={handleConfirm}
-            onModify={handleModify}
           />
         </section>
         <section className="min-h-[60vh] md:min-h-0">
-          <PreviewPane html={generatedHtml} generating={thinking && stage === "code"} />
+          <PreviewPane
+            html={generatedHtml}
+            projectName={projectName}
+            generating={thinking && stage === "code"}
+          />
         </section>
       </div>
     </main>

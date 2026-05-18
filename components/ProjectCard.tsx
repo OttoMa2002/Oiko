@@ -1,6 +1,6 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { type AgentStage } from "@/lib/agents";
 import { AgentBadge } from "./AgentBadge";
 import { DeleteProjectButton } from "./DeleteProjectButton";
@@ -50,13 +50,7 @@ export function ProjectCard({
         href={`/workspace/${id}`}
         className="block space-y-3"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold text-zinc-900 truncate">{name}</h3>
-          <ArrowUpRight
-            size={16}
-            className="text-zinc-300 group-hover:text-zinc-900 transition-colors shrink-0"
-          />
-        </div>
+        <h3 className="font-semibold text-zinc-900 truncate pr-8">{name}</h3>
         <p className="text-sm text-zinc-500 line-clamp-2 min-h-[2.5rem]">
           {summary}
         </p>

@@ -46,6 +46,9 @@ export function NavigationProgress() {
       const form = e.target as HTMLFormElement | null;
       if (!form) return;
       if (form.target === "_blank") return;
+      // Opt-out for forms that don't cause navigation (e.g. the chat input
+      // textarea form, which submits to local state).
+      if (form.hasAttribute("data-no-progress")) return;
       setTrigger((t) => t + 1);
     }
 

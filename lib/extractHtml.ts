@@ -33,15 +33,34 @@ export function extractHtml(raw: string): string {
 }
 
 /**
- * Defense script injected into agent-generated HTML before rendering in the
- * sandboxed preview iframe. Blocks the "click an anchor → iframe loads the
- * parent URL recursively" bug that arises from `about:srcdoc` not supporting
- * hash navigation. Same-page anchors still scroll smoothly; everything else
- * is a no-op.
+ * Defense payload injected into the <head> of agent-generated HTML before
+ * rendering in the sandboxed preview iframe. Three layers, defense in depth:
+ *
+ * 1. <base href="...invalid/"> — `about:srcdoc` resolves relative URLs against
+ *    the *parent page* URL, so a Claude-generated `<a href="/">` would point at
+ *    the Oiko app itself and navigating the iframe loads our own site inside
+ *    the preview. Rebasing relative URLs to a guaranteed-unresolvable host
+ *    (.invalid is IANA-reserved, DNS always fails) means even if every JS
+ *    layer below misses, the worst case is a blank load, not "the preview
+ *    becomes the Oiko homepage".
+ *    Note: Tailwind CDN and https://placehold.co/ images are absolute URLs
+ *    and unaffected. Code agent's system prompt mandates absolute image URLs.
+ *
+ * 2. Capture-phase click/submit interceptors — preventDefault on every <a>
+ *    click (smooth-scrolling same-page #anchors) and every <form> submit.
+ *    Placed in <head> so they're armed before any user interaction.
+ *
+ * 3. Monkey-patch location.assign/replace/reload — backstop for inline
+ *    handlers like `onclick="location.href='/'"` that bypass preventDefault
+ *    by directly invoking JS navigation. href setter is on prototype and
+ *    often non-configurable so we can't reliably override it; layer 1 catches
+ *    that case.
  */
-const IFRAME_DEFENSE_SCRIPT = `
-<script>
+const IFRAME_DEFENSE_HEAD = `
+<base href="https://oiko-preview-isolated.invalid/">
+<script>/* oiko-defense */
 (function() {
+  var noop = function() {};
   document.addEventListener('click', function(e) {
     var a = e.target && e.target.closest ? e.target.closest('a') : null;
     if (!a) return;
@@ -53,32 +72,35 @@ const IFRAME_DEFENSE_SCRIPT = `
         if (target && target.scrollIntoView) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      } catch (err) { /* invalid selector — ignore */ }
+      } catch (err) {}
       return;
     }
     e.preventDefault();
+    e.stopImmediatePropagation();
   }, true);
   document.addEventListener('submit', function(e) {
     e.preventDefault();
+    e.stopImmediatePropagation();
   }, true);
+  try { window.location.assign = noop; } catch (e) {}
+  try { window.location.replace = noop; } catch (e) {}
+  try { window.location.reload = noop; } catch (e) {}
 })();
 </script>
 `;
 
 /**
- * Inject the navigation-defense script into a Claude-generated HTML document
- * just before its `</body>` (or appended if no body tag is present). Idempotent
- * if called twice — the script tag uses a marker comment to detect prior injection.
+ * Inject the navigation-defense payload at the top of <head> in a Claude-
+ * generated HTML document. Falls back to prepending a <head> block if none
+ * is present. Idempotent — checked via the /* oiko-defense *\/ marker.
  */
 export function wrapForIframe(html: string): string {
   if (html.includes("/* oiko-defense */")) return html;
-  const marker = "<script>/* oiko-defense */";
-  const scriptWithMarker = IFRAME_DEFENSE_SCRIPT.replace(
-    "<script>",
-    marker,
-  );
-  if (/<\/body>/i.test(html)) {
-    return html.replace(/<\/body>/i, `${scriptWithMarker}</body>`);
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head([^>]*)>/i, `<head$1>${IFRAME_DEFENSE_HEAD}`);
   }
-  return html + scriptWithMarker;
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html([^>]*)>/i, `<html$1><head>${IFRAME_DEFENSE_HEAD}</head>`);
+  }
+  return `<head>${IFRAME_DEFENSE_HEAD}</head>${html}`;
 }

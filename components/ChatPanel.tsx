@@ -20,7 +20,6 @@ type Props = {
   done: boolean;
   onSend: (text: string) => void;
   onConfirm: () => void;
-  onModify: () => void;
 };
 
 export function ChatPanel({
@@ -32,7 +31,6 @@ export function ChatPanel({
   done,
   onSend,
   onConfirm,
-  onModify,
 }: Props) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -48,11 +46,6 @@ export function ChatPanel({
     if (!text || inputDisabled) return;
     onSend(text);
     setDraft("");
-  }
-
-  function handleModifyClick() {
-    textareaRef.current?.focus();
-    onModify();
   }
 
   const meta = AGENT_META[activeStage];
@@ -100,13 +93,13 @@ export function ChatPanel({
             stage={activeStage}
             disabled={actionsDisabled}
             onConfirm={onConfirm}
-            onModify={handleModifyClick}
           />
         </div>
       )}
 
       <form
         onSubmit={handleSubmit}
+        data-no-progress
         className="p-3 border-t border-zinc-200 bg-zinc-50"
       >
         <div

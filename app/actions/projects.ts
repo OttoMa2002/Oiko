@@ -17,7 +17,9 @@ function todayIso() {
 }
 
 /** Create a new project for the current user, returning its id. */
-export async function createProject(): Promise<{ id: string }> {
+export async function createProject(
+  initialPrompt?: string | null,
+): Promise<{ id: string }> {
   const supabase = createClient();
   const {
     data: { user },
@@ -35,9 +37,10 @@ export async function createProject(): Promise<{ id: string }> {
   }
 
   const name = `Untitled · ${todayIso()}`;
+  const trimmed = initialPrompt?.trim() || null;
   const { data, error } = await supabase
     .from("projects")
-    .insert({ user_id: user.id, name })
+    .insert({ user_id: user.id, name, initial_prompt: trimmed })
     .select("id")
     .single();
 
@@ -48,12 +51,17 @@ export async function createProject(): Promise<{ id: string }> {
 /**
  * Form-action helper: create a new project then redirect into its workspace.
  * On project-cap hit, redirects back to dashboard with an error banner.
- * Used by both the dashboard "新建项目" button and the landing page demo CTA.
+ * Reads optional `prompt` field from FormData — used by landing-page example
+ * cards to pre-fill the project. Dashboard "新建项目" button passes no FormData
+ * and creates an empty project.
  */
-export async function startNewProjectAction(): Promise<never> {
+export async function startNewProjectAction(formData?: FormData): Promise<never> {
+  const prompt = formData?.get("prompt");
+  const initialPrompt = typeof prompt === "string" ? prompt : null;
+
   let newId: string;
   try {
-    const result = await createProject();
+    const result = await createProject(initialPrompt);
     newId = result.id;
   } catch (e) {
     if (e instanceof Error && e.message === PROJECT_CAP_ERROR) {

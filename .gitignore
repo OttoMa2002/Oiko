@@ -44,3 +44,6 @@ pnpm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# personal / scratch
+interview-prep.md
